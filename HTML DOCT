@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Student Platform + Prediction</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #f2f2f2;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 10px;
+      cursor: pointer;
+    }
+
+    .post {
+      background: #eee;
+      padding: 10px;
+      margin-top: 15px;
+      border-radius: 5px;
+    }
+
+    .reply {
+      margin-left: 20px;
+      background: #dff0d8;
+      padding: 5px;
+      margin-top: 5px;
+      border-radius: 5px;
+    }
+
+    .prediction {
+      background: #fff3cd;
+      padding: 10px;
+      margin-top: 20px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h2>📚 Student Platform</h2>
+
+  <input id="questionInput" placeholder="Ask a question..." />
+  <button onclick="addQuestion()">Post Question</button>
+
+  <h3>Questions</h3>
+  <div id="posts"></div>
+
+  <div class="prediction">
+    <h3>📊 Exam Prediction</h3>
+    <button onclick="predictTopics()">Show Predictions</button>
+    <div id="predictionBox"></div>
+  </div>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  getDocs 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// 🔥 PUT YOUR FIREBASE CONFIG HERE
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// =====================
+// ADD QUESTION
+// =====================
+window.addQuestion = async function () {
+  let q = document.getElementById("questionInput").value;
+  if (!q) return;
+
+  await addDoc(collection(db, "questions"), {
+    text: q,
+    time: Date.now()
+  });
+
+  document.getElementById("questionInput").value = "";
+  loadQuestions();
+};
+
+// =====================
+// ADD REPLY
+// =====================
+window.addReply = async function (questionId) {
+  let r = prompt("Write your answer:");
+  if (!r) return;
+
+  await addDoc(collection(db, "replies"), {
+    text: r,
+    questionId: questionId,
+    time: Date.now()
+  });
+
+  loadQuestions();
+};
+
+// =====================
+// LOAD QUESTIONS + REPLIES
+// =====================
+async function loadQuestions() {
+  let postsDiv = document.getElementById("posts");
+  postsDiv.innerHTML = "";
+
+  let qSnap = await getDocs(collection(db, "questions"));
+  let rSnap = await getDocs(collection(db, "replies"));
+
+  let replies = [];
+
+  rSnap.forEach(doc => {
+    replies.push(doc.data());
+  });
+
+  qSnap.forEach(doc => {
+    let q = doc.data();
+    let id = doc.id;
+
+    let html = `
+      <div class="post">
+        ❓ ${q.text}
+        <br>
+        <button onclick="addReply('${id}')">Reply</button>
+    `;
+
+    replies.forEach(r => {
+      if (r.questionId === id) {
+        html += `<div class="reply">👉 ${r.text}</div>`;
+      }
+    });
+
+    html += `</div>`;
+
+    postsDiv.innerHTML += html;
+  });
+}
+
+// =====================
+// EXAM PREDICTION ENGINE
+// =====================
+window.predictTopics = async function () {
+
+  let qSnap = await getDocs(collection(db, "questions"));
+
+  let keywordCount = {
+    "Trigonometry": 0,
+    "Quadratic": 0,
+    "Organic": 0,
+    "Motion": 0,
+    "Electricity": 0
+  };
+
+  qSnap.forEach(doc => {
+    let text = doc.data().text.toLowerCase();
+
+    if (text.includes("trig")) keywordCount["Trigonometry"]++;
+    if (text.includes("quadratic")) keywordCount["Quadratic"]++;
+    if (text.includes("organic")) keywordCount["Organic"]++;
+    if (text.includes("motion")) keywordCount["Motion"]++;
+    if (text.includes("electric")) keywordCount["Electricity"]++;
+  });
+
+  let result = "<h4>Predicted Important Topics:</h4>";
+
+  for (let topic in keywordCount) {
+    if (keywordCount[topic] > 0) {
+      result += `<p>🔥 ${topic} (High chance)</p>`;
+    }
+  }
+
+  document.getElementById("predictionBox").innerHTML = result;
+};
+
+loadQuestions();
+
+</script>
+
+</body>
+</html>
